@@ -47,7 +47,7 @@ def heffingskortingen(inkomen):
 
 def ib_box1(salaris, aow_leeftijd):
     premie_grondslag = max(0, salaris - AOW_FRANCHISE)
-    premie = premie_grondslag * (WLZ_ALLEEN if aow_leeftijd else AOW_PREMIECENTAGE)
+    premie = premie_grondslag * (WLZ_ALLEEN if aow_leeftijd else AOW_PREMIECENTRAGE)
 
     ib = 0
     rest = salaris
@@ -55,7 +55,8 @@ def ib_box1(salaris, aow_leeftijd):
         schijf = rest if boven is None else min(rest, boven - onder)
         ib += schijf * tarief
         rest -= schijf
-        if rest <= 0: break
+        if rest <= 0:
+            break
 
     korting = heffingskortingen(salaris)
     te_betalen = max(0, ib + premie - korting)
@@ -68,7 +69,8 @@ def box2(dividend):
         schijf = rest if boven is None else min(rest, boven - onder)
         belasting += schijf * tarief
         rest -= schijf
-        if rest <= 0: break
+        if rest <= 0:
+            break
     return round(belasting), round(dividend - belasting)
 
 def vpb_berekenen(winst):
@@ -78,7 +80,8 @@ def vpb_berekenen(winst):
         schijf = rest if boven is None else min(rest, boven - onder)
         belasting += schijf * tarief
         rest -= schijf
-        if rest <= 0: break
+        if rest <= 0:
+            break
     return round(belasting)
 
 def bereken_scenario(salaris, dividend, aow_leeftijd):
@@ -108,8 +111,9 @@ def bereken_scenario(salaris, dividend, aow_leeftijd):
 
 # === Sidebar input ===
 st.sidebar.header("Jouw situatie")
-totaal_bedrag = st.sidebar.number_input("Hoeveel geld wil je in 2026 uit de BV halen?", 
-                                         min_value=50000, value=250000, step=10000)
+totaal_bedrag = st.sidebar.number_input(
+    "Hoeveel geld wil je in 2026 uit de BV halen?", min_value=50000, value=250000, step=10000
+)
 min_loon = st.sidebar.number_input("Minimum gebruikelijk loon 2026 (verwacht)", value=56000, step=1000)
 aow_leeftijd = st.sidebar.checkbox("Ik heb in 2026 al de AOW-leeftijd")
 
@@ -124,15 +128,17 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("1. Minimumloon + rest dividend (meestal optimaal)")
     dividend1 = totaal_bedrag - min_loon
-    if dividend1 < 0: dividend1 = 0
+    if dividend1 < 0:
+        dividend1 = 0
     res1 = bereken_scenario(min_loon, dividend1, aow_leeftijd)
     st.metric("Totaal netto", res1["TOTAAL NETTO"])
     st.caption(f"Effectief {res1['Effectief % belasting']} belasting")
 
 with col2:
     st.subheader("2. Zelf gekozen salaris")
-    salaris_keuze = st.slider("DGA-salaris", min_value=min_loon, max_value=totaal_bedrag, 
-                              value=max(min_loon, 75000), step=5000)
+    salaris_keuze = st.slider(
+        "DGA-salaris", min_value=min_loon, max_value=totaal_bedrag, value=max(min_loon, 75000), step=5000
+    )
     dividend_keuze = totaal_bedrag - salaris_keuze
     res2 = bereken_scenario(salaris_keuze, dividend_keuze, aow_leeftijd)
     st.metric("Totaal netto", res2["TOTAAL NETTO"])
@@ -143,14 +149,17 @@ st.header("Vergelijking verschillende salarissen")
 data = []
 for sal in range(min_loon, min(totaal_bedrag + 1, 150001), 10000):
     div = totaal_bedrag - sal
-    if div < 0: continue
+    if div < 0:
+        continue
     res = bereken_scenario(sal, div, aow_leeftijd)
-    data.append({
-        "Salaris": f"€{sal:,}",
-        "Dividend": f"€{div:,}",
-        "Totaal netto": int(res["TOTAAL NETTO"].replace("€","”).replace(",","”)),
-        "Belasting %": res["Effectief % belasting"]
-    })
+    data.append(
+        {
+            "Salaris": f"€{sal:,}",
+            "Dividend": f"€{div:,}",
+            "Totaal netto": int(res["TOTAAL NETTO"].replace("€", "").replace(",", "")),
+            "Belasting %": res["Effectief % belasting"],
+        }
+    )
 
 
 df = pd.DataFrame(data)
@@ -160,6 +169,8 @@ st.line_chart(df, x="Salaris", y="Totaal netto", use_container_width=True)
 
 st.dataframe(df.style.highlight_max(subset=["Totaal netto"], color="#d4edda"), use_container_width=True)
 
-st.success(f"🎯 Optimaal scenario: salaris €{beste['Salaris'].replace('€','')} + dividend €{int(totaal_bedrag) - int(beste['Salaris'].replace('€','').replace(',','')):,} → **{beste['Totaal netto']:,} netto**")
+st.success(
+    f"🎯 Optimaal scenario: salaris €{beste['Salaris'].replace('€','')} + dividend €{int(totaal_bedrag) - int(beste['Salaris'].replace('€','').replace(',', '')):,} → **{beste['Totaal netto']:,} netto**"
+)
 
 st.caption("Let op: dit is een indicatie. Definitieve tarieven worden pas september 2026 bekend. Geen fiscaal advies, etc. etc.")
