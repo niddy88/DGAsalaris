@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgasalaris"
+version = "0.0.0"
+description = "DGAsalaris - small package to import scripts"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [{name = "niddy88"}]
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
