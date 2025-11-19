@@ -1,113 +1,110 @@
 import streamlit as st
-from datetime import datetime
 
-st.set_page_config(page_title="DGA Salaris Calculator", layout="centered")
+st.set_page_config(page_title="DGA Salaris Calculator 2025", layout="centered")
 st.title("🇳🇱 DGA Salaris & Dividend Calculator 2025")
 
-# Huidige jaar
-jaar = 2025
+# === Tarieven 2025 (officieel per Prinsjesdag + nov 2024 aanpassingen) ===
+JAAR = 2025
+MINIMUM_DGA_SALARIS = 56000
 
-# Belastingtarieven & bedragen 2025 (bron: Belastingdienst + officiële publicaties)
-# Box 1
-inkomensbelasting_schijf1_grens = 38703
-inkomensbelasting_schijf1_percentage = 0.3693
-inkomensbelasting_schijf2_percentage = 0.3995
-inkomensbelasting_schijf3_percentage = 0.495
+# Box 1 schijven
+SCHIJF1_GRENZ = 38703
+SCHIJF1_TARIEF = 0.3693   # incl. premie volksverzekeringen
+SCHIJF2_TARIEF = 0.3995
+SCHIJF3_TARIEF = 0.495
 
-# Box 2 (aanmerkelijk belang)
-box2_drempel = 1300000
-box2_laag_percentage = 0.246
-box2_hoog_percentage = 0.314
+# Premie volksverzekeringen (alleen tot schijf 1)
+PREMIE_VOLKS = 0.276
 
-# Premies volksverzekeringen (AOW, Anw, Wlz) - alleen voor inkomen tot schijf 1 grens
-premie_volksverzekeringen = 0.276
+# Max kortingen (ruwweg, goed genoeg voor indicatie)
+MAX_ARBEIDSKORTING = 5350
+MAX_HEFFINGSKORTING = 3070
 
-# Algemene heffingskorting & arbeidskorting 2025 (vereenvoudigd, max bedragen)
-max_arbeidskorting = 5350
-max_heffingskorting = 3070
+# Box 2
+BOX2_DREM  = 1300000
+BOX2_LAAG  = 0.246
+BOX2_HOOG  = 0.314
 
-# DGA minimumloon 2025
-minimum_dga_salaris = 56000
+# === Functie: bruto salaris berekenen uit gewenst netto salaris ===
+def bruto_voor_netto_salaris(netto_gewenst):
+    if netto_gewenst <= 0:
+        return 0
+    
+    bruto = netto_gewenst * 1.5  # startpunt
+    for _ in range(25):  # iteratief nauwkeurig maken
+        inkomen = bruto
+        
+        # Premies
+        premie = min(inkomen, SCHIJF1_GRENZ) * PREMIE_VOLKS
+        
+        # Belasting box 1
+        if inkomen <= SCHIJF1_GRENZ:
+            ib = inkomen * SCHIJF1_TARIEF
+        else:
+            ib = SCHIJF1_GRENZ * SCHIJF1_TARIEF + (inkomen - SCHIJF1_GRENZ) * SCHIJF2_TARIEF
+        
+        # Korting schatten
+        korting = min(MAX_ARBEIDSKORTING + MAX_HEFFINGSKORTING, ib * 0.7)
+        
+        netto_calc = bruto - ib - premie + korting
+        
+        if abs(netto_calc - netto_gewenst) < 50:
+            break
+        elif netto_calc < netto_gewenst:
+            bruto += (netto_gewenst - netto_calc) * 1.45
+        else:
+            bruto -= (netto_calc - netto_gewenst) * 1.2
+            
+    return max(round(bruto), MINIMUM_DGA_SALARIS)
 
-tab1, tab2 = st.tabs(["Normaal (bruto → netto)", "Expert (totaal netto gewenst)"])
+# Sidebar voor algemene instellingen
+with st.sidebar:
+    st.header("Algemene instellingen")
+    gewenst_totaal_netto = st.number_input("Totaal netto per jaar (salaris + dividend)", 
+                                            min_value=50000, value=120000, step=5000)
+    dividend_percentage = st.slider("Percentage netto uit dividend", 0, 100, 40, help="0% = alles salaris, 100% = alles dividend")
+
+# Bereken split
+netto_dividend = gewenst_totaal_netto * (dividend_percentage / 100)
+netto_salaris = gewenst_totaal_netto - netto_dividend
+
+bruto_salaris = bruto_voor_netto_salaris(netto_salaris)
+
+# Box 2 berekening (bruto dividend nodig)
+bruto_dividend = netto_dividend / (1 - BOX2_LAAG)
+if bruto_dividend > BOX2_DREM:
+    extra = (bruto_dividend - BOX2_DREM) * (BOX2_HOOG - BOX2_LAAG)
+    bruto_dividend += extra / (1 - BOX2_HOOG)
+bruto_dividend = round(bruto_dividend)
+
+tab1, tab2 = st.tabs(["🏠 Normaal (bruto → netto)", "⚙️ Expert (exact netto totaal)"])
 
 with tab1:
-    st.subheader("Hoeveel salaris + dividend wil je netto overhouden?")
-    
+    st.metric("Totaal gewenst netto per jaar", f"€{gewenst_totaal_netto:,}")
+
     col1, col2 = st.columns(2)
     with col1:
-        gewenst_netto_totaal = st.number_input("Totaal netto per jaar (salaris + dividend)", min_value=0, value=100000, step=5000)
+        st.subheader("Salaris")
+        st.metric("Bruto salaris", f"€{bruto_salaris:,}")
+        st.metric("Netto salaris", f"€{netto_salaris:,}")
+        st.caption(f"Maand netto salaris ≈ €{round(netto_salaris/12):,}")
+
     with col2:
-        dividend_deel = st.slider("Percentage dat uit dividend komt (%)", 0, 100, 30)
-
-    dividend_netto = gewenst_netto_totaal * (dividend_deel / 100)
-    salaris_netto_nodig = gewenst_netto_totaal - dividend_netto
-
-    # Bereken bruto salaris dat nodig is voor het netto salaris deel
-    def bereken_bruto_uit_netto(netto):
-        if netto <= 0:
-            return 0
-        # Simpele iteratie om bruto te vinden (nauwkeurig genoeg)
-        bruto = netto
-        for _ in range(20):
-            belasting = 0
-            belastbaar = bruto
-            
-            # Premie volksverzekeringen alleen over eerste schijf
-            if belastbaar <= inkomensbelasting_schijf1_grens:
-                premie = belastbaar * premie_volksverzekeringen
-            else:
-                premie = inkomensbelasting_schijf1_grens * premie_volksverzekeringen
-            
-            # Inkomensbelasting
-            if belastbaar <= inkomensbelasting_schijf1_grens:
-                belasting = belastbaar * inkomensbelasting_schijf1_percentage
-            else:
-                belasting = inkomensbelasting_schijf1_grens * inkomensbelasting_sch_n1_percentage + \
-                            (belastbaar - inkomensbelasting_schijf1_grens) * inkomensbelasting_schijf2_percentage
-            
-            # Korting (ruwweg)
-            korting = min(max_arbeidskorting + max_heffingskorting, belasting * 0.6)
-            
-            netto_berekend = bruto - belasting - premie + korting
-            
-            if netto_berekend < netto:
-                bruto += (netto - netto_berekend) * 1.4
-            else:
-                bruto -= (netto_berekend - netto) * 1.2
-        return round(bruto)
-
-    bruto_salaris = max(bereken_bruto_uit_netto(salaris_netto_nodig), minimum_dga_salaris)
-
-    # Box 2 berekening
-    bruto_dividend_voor_box2 = dividend_netto / (1 - box2_laag_percentage) if dividend_netto > 0 else 0
-    if bruto_dividend_voor_box2 > box2_drempel:
-        extra_belasting = (bruto_dividend_voor_box2 - box2_drempel) * (box2_hoog_percentage - box2_laag_percentage)
-        bruto_dividend_voor_box2 += extra_belasting / (1 - box2_hoog_percentage)
+        st.subheader("Dividend")
+        st.metric("Bruto dividend", f"€{bruto_dividend:,}")
+        st.metric("Netto dividend", f"€{netto_dividend:,}")
+        st.caption(f"Maand netto dividend ≈ €{round(netto_dividend/12):,}")
 
     st.divider()
-    
-    col_a, col_b, col_c = st.columns(3)
-    with col_a:
-        st.metric("Bruto salaris (min 56k)", f"€{bruto_salaris:,.0f}")
-        st.metric("Netto salaris", f"€{salaris_netto_nodig:,.0f}")
-    with col_b:
-        st.metric("Bruto dividend", f"€{bruto_dividend_voor_box2:,.0f}")
-        st.metric("Netto dividend", f"€{dividend_netto:,.0f}")
-    with col_c:
-        st.metric("Totaal netto", f"€{gewenst_netto_totaal:,.0f}", "✅")
-        st.metric("Totaal bruto uitkering", f"€{bruto_salaris + bruto_dividend_voor_box2:,.0f}")
+    st.success(f"**Totaal bruto uitkering bedrijf: €{bruto_salaris + bruto_dividend:,}**")
 
 with tab2:
-    st.subheader("Expert: ik weet precies wat ik totaal netto wil uitkeren")
+    st.subheader("Ik wil exact X netto uitkeren (salar))]
+    totaal_exact = st.number_input("Totaal netto uitkeren (salaris + dividend samen)", 
+                                   min_value=0, value=170000, step=5000)
     
-    totaal_netto_uitkeren = st.number_input("Totaal netto uit te keren (salaris + dividend samen)", min_value=0, value=170000, step=5000)
-    
-    maand_netto = totaal_netto_uitkeren / 12
-    
-    st.success(f"✅ Maandelijks netto op je rekening: **€{maand_netto:,.0f}**")
-    st.info(f"Jaarlijks netto: €{totaal_netto_uitkeren:,.0f}")
-    
-    st.caption("Hier wordt geen extra belasting meer afgetrokken – het bedrag dat je invult is echt wat je houdt.")
+    maand = totaal_exact / 12
+    st.success(f"Maandelijks netto op je rekening: **€{maand:,.0f}**")
+    st.info(f"Dat is gewoon {totaal_exact:,} / 12 → geen extra belasting meer afgetrokken.")
 
-st.caption(f"Calculatie voor {jaar} – gebaseerd op bekende tarieven per nov 2025. Geen garanties, altijd accountant checken bij grote bedragen.")
+st.caption(f"Berekend voor {JAAR} – indicatief. Tarieven gebaseerd op Belastingdienst november 2025.")
