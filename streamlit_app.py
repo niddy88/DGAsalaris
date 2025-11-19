@@ -47,7 +47,7 @@ def heffingskortingen(inkomen):
 
 def ib_box1(salaris, aow_leeftijd):
     premie_grondslag = max(0, salaris - AOW_FRANCHISE)
-    premie = premie_grondslag * (WLZ_ALLEEN if aow_leeftijd else AOW_PREMIECENTRAGE)
+    premie = premie_grondslag * (WLZ_ALLEEN if aow_leeftijd else AOW_PREMIECENTAGE)
 
     ib = 0
     rest = salaris
@@ -161,9 +161,8 @@ for sal in range(min_loon, min(totaal_bedrag + 1, 150001), 10000):
         }
     )
 
-
 df = pd.DataFrame(data)
-beste = df.loc[df["Totaal netto"].idxmax()]  
+beste = df.loc[df["Totaal netto"].idxmax()]
 
 st.line_chart(df, x="Salaris", y="Totaal netto", use_container_width=True)
 
